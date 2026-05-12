@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AtaKBS | Atatürk Üniversitesi Akıllı Kütüphane</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root {
+            --bg: #0b1018; --sidebar: #121926; --card: #182132;
+            --blue: #2563eb; --blue2: #3b82f6; --green: #22c55e;
+            --red: #ef4444; --wood: linear-gradient(145deg, #8b5a2b, #6f4518);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+        /* --- GİRİŞ EKRANI --- */
+        #login-screen {
+            height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(rgba(5,10,20,0.9), rgba(5,10,20,0.9)), url('https://images.unsplash.com/photo-1521587760476-6c12a4b040da?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover; z-index: 9999; position: absolute; width: 100%;
+        }
+        .obs-card { background: #111827; padding: 40px; border-radius: 24px; width: 420px; border: 1px solid var(--blue); box-shadow: 0 0 30px rgba(37,99,235,0.3); }
+        .obs-input { width: 100%; height: 52px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; color: white; padding: 0 15px; margin-bottom: 15px; }
+        .login-btn { width: 100%; height: 50px; border: none; border-radius: 12px; background: linear-gradient(135deg, var(--blue), var(--blue2)); color: white; font-weight: 700; cursor: pointer; }
+
+        /* --- ANA YAPI --- */
+        #main-app { display: none; height: 100vh; width: 100%; display: flex; }
+        .sidebar { width: 280px; background: var(--sidebar); padding: 25px; border-right: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; flex-shrink: 0; }
+        .content-area { flex: 1; padding: 20px; overflow: auto; background: #080c14; position: relative; }
+        .stats-panel { width: 320px; background: var(--sidebar); padding: 25px; border-left: 1px solid rgba(255,255,255,0.05); flex-shrink: 0; overflow-y: auto; transition: 0.4s; }
+
+        /* --- NAV BUTTONS --- */
+        .nav-group { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 10px; margin-bottom: 20px; }
+        .nav-btn { width: 100%; border: none; background: #1b2435; color: white; height: 45px; border-radius: 10px; text-align: left; padding-left: 15px; margin-bottom: 8px; transition: 0.3s; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .nav-btn:hover, .nav-btn.active { background: linear-gradient(135deg, var(--blue), var(--blue2)); }
+
+        /* --- MASA & SANDALYE --- */
+        .library-room { background: #111827; border-radius: 20px; padding: 40px; min-height: 850px; width: 100%; max-width: 1450px; position: relative; border: 2px solid #1e293b; overflow: auto; }
+        .table-grid { display: grid; grid-template-columns: repeat(4, 1fr) !important; gap: 60px; padding: 20px; justify-items: center; }
+        .real-table { width: 130px; height: 90px; background: var(--wood); border-radius: 10px; position: relative; border: 3px solid #5c3410; box-shadow: 0 8px 15px rgba(0,0,0,0.4); }
+        .chair { width: 24px; height: 24px; border-radius: 6px; background: var(--green); position: absolute; cursor: pointer; z-index: 5; }
+        .chair.occupied { background: var(--red); box-shadow: 0 0 10px var(--red); }
+        .chair.top1 { top: -12px; left: 20px; } .chair.top2 { top: -12px; right: 20px; }
+        .chair.bottom1 { bottom: -12px; left: 20px; } .chair.bottom2 { bottom: -12px; right: 20px; }
+
+        .seat-tooltip { position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 8px; border-radius: 8px; font-size: 10px; width: 125px; opacity: 0; transition: 0.3s; pointer-events: none; z-index: 100; border: 1px solid var(--blue2); text-align: left; }
+        .chair:hover .seat-tooltip { opacity: 1; bottom: 42px; }
+
+        /* --- GARAJ BLOKLARI (Nizami Sandalyeler) --- */
+        .garaj-horizontal { display: flex; gap: 45px; padding: 20px; min-width: max-content; }
+        .garaj-column { display: flex; flex-direction: column; gap: 35px; }
+        .garaj-block { width: 340px; background: var(--card); border-radius: 20px; padding: 18px; border: 1px solid #334155; }
+        .block-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; justify-items: center; }
+        .garaj-block .real-table { width: 60px; height: 45px; border-width: 2px; }
+        .garaj-block .chair { width: 12px; height: 12px; border-radius: 3px; }
+        .garaj-block .chair.top1 { top: -7px; left: 12px; } .garaj-block .chair.top2 { top: -7px; right: 12px; }
+        .garaj-block .chair.bottom1 { bottom: -7px; left: 12px; } .garaj-block .chair.bottom2 { bottom: -7px; right: 12px; }
+
+        /* ANALİZ KARTLARI */
+        .stat-card { background: #1a2434; padding: 18px; border-radius: 18px; margin-bottom: 20px; border-left: 4px solid var(--blue); }
+        .q-mini-card { background: #0f172a; padding: 12px; border-radius: 12px; margin-bottom: 10px; font-size: 11px; border-bottom: 2px solid var(--blue); }
+
+        /* AKADEMİK İŞ BİRLİĞİ (Geri Geldi) */
+        .chat-fab { position: fixed; right: 30px; bottom: 30px; width: 68px; height: 68px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1000; box-shadow: 0 8px 25px rgba(37,99,235,0.4); }
+        .chat-box { position: fixed; right: 30px; bottom: 120px; width: 400px; height: 600px; background: #0f172a; border-radius: 24px; display: none; flex-direction: column; border: 1px solid var(--blue); z-index: 1000; overflow: hidden; }
+
+        /* MOBİL ANALİZ PANELİ */
+        @media (max-width: 992px) {
+            .stats-panel { position: fixed; top: 0; right: -100%; width: 100% !important; height: 100vh; z-index: 2000; background: var(--sidebar); border-left: none; padding-top: 60px; }
+            .stats-panel.mobile-active { right: 0; }
+            .mobile-stats-bar { display: flex !important; justify-content: space-between; align-items: center; background: var(--blue); padding: 12px 20px; border-radius: 10px; margin-bottom: 15px; cursor: pointer; font-weight: bold; }
+            .close-panel-btn { display: block !important; position: absolute; top: 20px; right: 20px; font-size: 26px; color: var(--red); cursor: pointer; }
+        }
+        .mobile-stats-bar, .close-panel-btn { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="obs-card">
+        <center><img src="https://upload.wikimedia.org/wikipedia/tr/6/66/Atat%C3%BCrk_%C3%9Cniversitesi_logosu.png" style="width:90px; margin-bottom:20px;"></center>
+        <h4 class="text-center mb-4 text-white">AtaKBS Sistem Girişi</h4>
+        <input id="lEmail" class="obs-input" placeholder="Öğrenci E-postası">
+        <input id="lPass" type="password" class="obs-input" placeholder="Şifre">
+        <button id="lBtn" class="login-btn" onclick="handleLogin()">GİRİŞ YAP</button>
+        <p class="text-center mt-3 small"><a href="kayıt.html" style="color:var(--blue2); text-decoration:none;">Yeni Kayıt Oluştur</a></p>
+    </div>
+</div>
+
+<div id="main-app">
+    <div class="sidebar">
+        <h5 class="text-center mb-4 text-primary">ATATÜRK ÜNİVERSİTESİ</h5>
+        <div class="nav-group">
+            <button class="nav-btn" onclick="switchLoc(this,'merkez','B')"><i class="fas fa-layer-group"></i> Bodrum Kat</button>
+            <button class="nav-btn active" id="btn-def" onclick="switchLoc(this,'merkez','G')"><i class="fas fa-door-open"></i> Giriş Kat</button>
+            <button class="nav-btn" onclick="switchLoc(this,'merkez','1')"><i class="fas fa-level-up-alt"></i> 1. Kat</button>
+            <button class="nav-btn" onclick="switchLoc(this,'merkez','2')"><i class="fas fa-university"></i> 2. Kat</button>
+        </div>
+        <div class="nav-group"><button class="nav-btn" onclick="switchLoc(this,'garaj')"><i class="fas fa-warehouse"></i> Garaj Salonu</button></div>
+        <button class="btn btn-outline-danger btn-sm mt-auto" onclick="location.reload()">Güvenli Çıkış</button>
+    </div>
+
+    <div class="content-area">
+        <div class="mobile-stats-bar" onclick="tglStats()">
+            <span><i class="fas fa-chart-line"></i> Durum Analizini Gör</span>
+            <i class="fas fa-chevron-right"></i>
+        </div>
+        <div class="library-room" id="pContainer">
+            <div id="inner-content"></div>
+        </div>
+    </div>
+
+    <div class="stats-panel" id="sPanel">
+        <div class="close-panel-btn" onclick="tglStats()"><i class="fas fa-times-circle"></i></div>
+        <h6 class="text-secondary mb-4">DURUM ANALİZİ</h6>
+        <div class="stat-card">
+            <small>Anlık Doluluk</small>
+            <h3 id="percVal" class="text-success">%0</h3>
+            <div class="progress" style="height:6px; background:#080c14;"><div id="pBar" class="progress-bar bg-success" style="width:0%"></div></div>
+        </div>
+        <div class="stat-card"><small>Sessizlik Skoru</small><h4 class="text-info mt-2">%94</h4></div>
+        <div class="stat-card"><small><i class="fas fa-robot"></i> AI Tahmini</small><p class="small text-white-50 mt-2">Önümüzdeki saatlerde doluluk artışı bekleniyor. <b>2. Kat</b> sakin bölge.</p></div>
+        <div class="stat-card">
+            <small><i class="fas fa-graduation-cap"></i> Akademik Akış</small>
+            <div id="live-questions" class="mt-2">
+                <div class="q-mini-card"><b>İİBF - YBS:</b> Python Pandas kütüphanesi için kaynak önerisi var mı?</div>
+                <div class="q-mini-card"><b>Mühendislik:</b> Termodinamik sınavına çalışacak arkadaş aranıyor.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="chat-fab" onclick="tglChat()"><i class="fas fa-comments"></i></div>
+<div class="chat-box" id="cBox">
+    <div class="p-3 bg-dark border-bottom">Akademik İş Birliği</div>
+    <div class="p-3">
+        <select id="qFac" class="form-select form-select-sm bg-dark text-white mb-2" onchange="updateDepts()">
+            <option value="">Fakülte Seçin</option>
+            <option value="İİBF">İİBF</option>
+            <option value="Mühendislik">Mühendislik</option>
+            <option value="Edebiyat">Edebiyat</option>
+        </select>
+        <select id="qDep" class="form-select form-select-sm bg-dark text-white mb-2"><option value="">Bölüm Seçin</option></select>
+        <textarea id="qTxt" class="form-control form-control-sm bg-dark text-white mb-2" placeholder="Sorunuz..."></textarea>
+        <button class="btn btn-primary btn-sm w-100" onclick="sendQ()">Gönder</button>
+    </div>
+    <div class="chat-messages p-3" id="chatMsgs" style="flex:1; overflow-y:auto;"></div>
+</div>
+
+<script>
+// VERDİĞİN GÜNCEL BİLGİLERLE BAĞLANTI KURULDU
+const S_URL = "https://wuwgokcpxecywgxhlbiv.supabase.co"; 
+const S_KEY = "sb_publishable_WItWTjdch3-1G5fDo9gvBQ_7kJukZzM";
+const supabaseClient = supabase.createClient(S_URL, S_KEY);
+
+const depts = { "İİBF": ["YBS", "İşletme", "İktisat"], "Mühendislik": ["Bilgisayar", "İnşaat", "Makine"], "Edebiyat": ["Tarih", "Psikoloji"] };
+function updateDepts() {
+    const fac = document.getElementById("qFac").value;
+    const depSelect = document.getElementById("qDep");
+    depSelect.innerHTML = '<option value="">Bölüm Seçin</option>';
+    if (depts[fac]) depts[fac].forEach(d => depSelect.innerHTML += `<option value="${d}">${d}</option>`);
+}
+
+async function handleLogin() {
+    const e = document.getElementById('lEmail').value, p = document.getElementById('lPass').value;
+    const btn = document.getElementById('lBtn');
+    if(!e || !p) return alert("Bilgileri girin!");
+    btn.innerText = "Giriş Yapılıyor...";
+    try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email: e, password: p });
+        if(error) { alert("Hata: " + error.message); btn.innerText="GİRİŞ YAP"; }
+        else { document.getElementById('login-screen').style.display='none'; document.getElementById('main-app').style.display='flex'; switchLoc(document.getElementById('btn-def'), 'merkez', 'G'); }
+    } catch(err) {
+        alert("Bağlantı başarısız!"); btn.innerText="GİRİŞ YAP";
+    }
+}
+
+function createTable(id, index) {
+    const isEdge = (index % 4 === 0 || index % 4 === 3);
+    return `<div class="real-table">
+        <div class="chair top1" onclick="tgl(this)"><div class="seat-tooltip">⚡ Priz: Var<br>🪟 Cam: ${isEdge?'Kenarı':'Uzak'}</div></div>
+        <div class="chair top2" onclick="tgl(this)"><div class="seat-tooltip">⚡ Priz: Var<br>🪟 Cam: ${isEdge?'Kenarı':'Uzak'}</div></div>
+        <div class="chair bottom1" onclick="tgl(this)"><div class="seat-tooltip">⚡ Priz: Var<br>🪟 Cam: ${isEdge?'Kenarı':'Uzak'}</div></div>
+        <div class="chair bottom2" onclick="tgl(this)"><div class="seat-tooltip">⚡ Priz: Var<br>🪟 Cam: ${isEdge?'Kenarı':'Uzak'}</div></div>
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:8px; opacity:0.3;">${id}</div>
+    </div>`;
+}
+
+function switchLoc(btn, loc, cat) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const inner = document.getElementById("inner-content");
+    inner.innerHTML = "";
+    if(loc === 'merkez') {
+        inner.innerHTML = `<h5 class="mb-4">Kat ${cat} Planı</h5><div class="table-grid" id="tg"></div>`;
+        for(let i=1; i<=24; i++) document.getElementById("tg").innerHTML += createTable("M"+i, i-1);
+    } else {
+        inner.innerHTML = `<div class="garaj-horizontal">
+            <div class="garaj-column"><div class="garaj-block"><div class="text-center small mb-2">A BLOK</div><div class="block-grid" id="blk-A"></div></div></div>
+            <div class="garaj-column"><div class="garaj-block"><div class="text-center small mb-2">B BLOK</div><div class="block-grid" id="blk-B"></div></div><div class="garaj-block"><div class="text-center small mb-2">C BLOK</div><div class="block-grid" id="blk-C"></div></div></div>
+            <div class="garaj-column"><div class="garaj-block"><div class="text-center small mb-2">D BLOK</div><div class="block-grid" id="blk-D"></div></div><div class="garaj-block"><div class="text-center small mb-2">E BLOK</div><div class="block-grid" id="blk-E"></div></div></div>
+            <div class="garaj-column"><div class="garaj-block"><div class="text-center small mb-2">F BLOK</div><div class="block-grid" id="blk-F"></div></div><div class="garaj-block"><div class="text-center small mb-2">G BLOK</div><div class="block-grid" id="blk-G"></div></div></div>
+        </div>`;
+        ["A","B","C","D","E","F","G"].forEach(b => { 
+            const blk = document.getElementById("blk-"+b);
+            if(blk) for(let i=1; i<=20; i++) blk.innerHTML += createTable(b+i, i-1); 
+        });
+    }
+    upd();
+}
+
+function tgl(el) { el.classList.toggle("occupied"); upd(); }
+function upd() {
+    const t = document.querySelectorAll(".chair").length, o = document.querySelectorAll(".chair.occupied").length;
+    const p = Math.round((o/t)*100) || 0;
+    document.getElementById("percVal").innerText = "%" + p;
+    document.getElementById("pBar").style.width = p + "%";
+}
+function tglChat() { const c = document.getElementById("cBox"); c.style.display = c.style.display === "flex" ? "none" : "flex"; }
+function tglStats() { document.getElementById('sPanel').classList.toggle('mobile-active'); }
+function sendQ() {
+    const f = document.getElementById("qFac").value, d = document.getElementById("qDep").value, t = document.getElementById("qTxt").value;
+    if(!t) return;
+    const html = `<div class="q-mini-card"><b>${f} - ${d}:</b> ${t}</div>`;
+    document.getElementById("chatMsgs").innerHTML = html + document.getElementById("chatMsgs").innerHTML;
+    document.getElementById("live-questions").innerHTML = html + document.getElementById("live-questions").innerHTML;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>AtaKBS | Yeni Kayıt</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #0b1018; color: white; height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', sans-serif; }
+        .card { background: #111827; padding: 40px; border-radius: 20px; width: 420px; border: 1px solid #2563eb; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        input { background: #0f172a !important; border: 1px solid #334155 !important; color: white !important; margin-bottom: 15px; height: 50px; }
+        .btn-primary { background: linear-gradient(135deg, #2563eb, #3b82f6); border: none; height: 50px; font-weight: 700; width: 100%; }
+        .footer-link { display: block; text-align: center; margin-top: 15px; color: #94a3b8; text-decoration: none; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3 class="text-center mb-4 text-primary">Yeni Öğrenci Kaydı</h3>
+        <input type="email" id="regEmail" class="form-control" placeholder="E-posta (@atauni.edu.tr)">
+        <input type="password" id="regPass" class="form-control" placeholder="Şifre (Min. 6 karakter)">
+        <button id="regBtn" class="btn-primary" onclick="handleRegister()">KAYDOL</button>
+        <a href="index.html" class="footer-link">Giriş Ekranına Geri Dön</a>
+    </div>
+
+    <script>
+        const SU_URL = "https://wuwgokcpxecywgxhlbiv.supabase.co";
+        const SU_KEY = "sb_publishable_WItWTjdch3-1G5fDo9gvBQ_7kJukZzM";
+        const supabaseClient = supabase.createClient(SU_URL, SU_KEY);
+
+        async function handleRegister() {
+            const email = document.getElementById('regEmail').value;
+            const pass = document.getElementById('regPass').value;
+            const btn = document.getElementById('regBtn');
+
+            if(!email || !pass) { alert("Tüm alanları doldurun!"); return; }
+            if(pass.length < 6) { alert("Şifre en az 6 karakter olmalıdır!"); return; }
+
+            btn.disabled = true;
+            btn.innerText = "Kaydediliyor...";
+
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: pass
+            });
+
+            if (error) {
+                alert("Hata: " + error.message);
+                btn.disabled = false;
+                btn.innerText = "KAYDOL";
+            } else {
+                alert("Kayıt Başarılı! Artık giriş yapabilirsiniz.");
+                window.location.href = "index.html";
+            }
+        }
+    </script>
+</body>
+</html>
